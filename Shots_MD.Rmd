@@ -1,0 +1,41 @@
+---
+title: "NBA Shot Project"
+author: "Chris Williams"
+date: "August 20, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE}
+install.packages("tidyverse")
+```
+
+```{r package}
+library(tidyverse)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r read_data}
+shots <- read_csv("nba_shots.csv")
+shots <- shots %>% mutate_if(is.character, as.factor)
+str(shots)
+totals <- read_csv("totals_1415.csv")
+into_names <- names(totals) %>% str_split(",") %>% .[[1]]
+names(totals) <- "x"
+totals <- totals %>% separate(x, into_names, sep = ",")
+totals <- as_data_frame(totals)
+positions <- totals %>% select(c("Player", "Pos"))
+head(totals)
+## now i need to do some checking of missing values and get a sense of what is going on with the data including
+## some exploratory analysis and visualization but also want to get some kind of merge with the positions so 
+## that the nearest defender length/size can be included
+```
+
+```{r}
+shots <- shots %>% mutate_if(is.character, as.factor)
+
+```
