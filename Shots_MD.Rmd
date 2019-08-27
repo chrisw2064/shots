@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo=FALSE}
-install.packages("tidyverse")
 ```
 
 ```{r package}
@@ -21,9 +20,11 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 ```{r read_data}
 shots <- read_csv("nba_shots.csv")
-shots <- shots %>% str_to_title(.$player_name)
+player_names <- map_chr(shots$player_name, str_to_title)
+shots$player_name <- player_names
 shots <- shots %>% mutate_if(is.character, as.factor)
 str(shots)
+shots_nested <- shots %>% group_by(GAME_ID) %>% nest()
 totals <- read_csv("totals_1415.csv")
 into_names <- names(totals) %>% str_split(",") %>% .[[1]]
 names(totals) <- "x"
@@ -32,8 +33,8 @@ totals <- as_data_frame(totals)
 head(totals)
 positions <- totals %>% select(c("Player", "Pos"))
 head(positions)
-## now i need to do some checking of missing values and get a sense of what is going on with the data including
-## some exploratory analysis and visualization but also want to get some kind of merge with the positions so 
+## checking of missing values and get a sense of what is going on with the data including
+## some exploratory analysis and visualization but also want to join with positions so 
 ## that the nearest defender length/size can be included
 ```
 
@@ -42,7 +43,7 @@ nrow(positions)
 n_distinct(positions)
 positions <- positions %>% distinct(Player, .keep_all = TRUE)
 sum(is.na(positions$Player))
+positions[which(is.na(positions$Player)), ]
 positions <- positions %>% drop_na()
-#positions[-which(is.na(positions$Player)), ]
-##this was just a rdeference line of where the data came from in the totals df
+##this was just a reference line of where the data came from in the totals df
 ```
