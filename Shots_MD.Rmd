@@ -33,7 +33,7 @@ totals <- as_data_frame(totals)
 head(totals)
 positions <- totals %>% select(c("Player", "Pos"))
 head(positions)
-## checking of missing values and get a sense of what is going on with the data including
+## checking for missing values and get a sense of what is going on with the data including
 ## some exploratory analysis and visualization but also want to join with positions so 
 ## that the nearest defender length/size can be included
 ```
@@ -45,5 +45,10 @@ positions <- positions %>% distinct(Player, .keep_all = TRUE)
 sum(is.na(positions$Player))
 positions[which(is.na(positions$Player)), ]
 positions <- positions %>% drop_na()
+#unique(unlist(str_split(positions$Player, "")))
+#str_which(positions$Player, "\\?")
+positions$Player <- str_replace_all(positions$Player, "\\\\.*", "")
+positions$Player <- str_replace_all(positions$Player, "\uFFFD", '')
+View(positions)
 ##this was just a reference line of where the data came from in the totals df
 ```
