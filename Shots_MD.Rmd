@@ -45,10 +45,17 @@ positions <- positions %>% distinct(Player, .keep_all = TRUE)
 sum(is.na(positions$Player))
 positions[which(is.na(positions$Player)), ]
 positions <- positions %>% drop_na()
-#unique(unlist(str_split(positions$Player, "")))
-#str_which(positions$Player, "\\?")
-positions$Player <- str_replace_all(positions$Player, "\\\\.*", "")
-positions$Player <- str_replace_all(positions$Player, "\uFFFD", '')
-View(positions)
 ##this was just a reference line of where the data came from in the totals df
+unique(unlist(str_split(positions$Player, "")))
+positions$Player <- str_replace_all(positions$Player, "\\\\.*", "")
+ufffd <- positions[str_which(positions$Player, "\uFFFD"), ]
+positions$Player <- str_replace_all(positions$Player, "\uFFFD", "")
+qmark <- positions[str_which(positions$Player, "\\?"),]
+positions$Player <- str_replace_all(positions$Player, "\\?", "")
+unique(unlist(str_split(positions$Player, "")))
+View(positions)
+mult_pos <- positions[str_which(positions$Pos, "[^A-Z]"),]
+mult_pos1 <- positions[str_which(positions$Pos, ".{3,}"),]
+#although position does not guarentee height the further from the positions should represent "mismatch" scenarios, was unable to find player height in a useable format.
+#end note = go back and examine players with missing and/or incorrect characters to fix their names
 ```
