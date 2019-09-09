@@ -22,7 +22,7 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 shots <- read_csv("nba_shots.csv")
 player_names <- map_chr(shots$player_name, str_to_title)
 shots$player_name <- player_names
-shots <- shots %>% mutate_if(is.character, as.factor)
+# wait on this shots <- shots %>% mutate_if(is.character, as.factor)
 str(shots)
 shots_nested <- shots %>% group_by(GAME_ID) %>% nest()
 totals <- read_csv("totals_1415.csv")
@@ -40,10 +40,11 @@ head(positions)
 
 ```{r explore_data}
 nrow(positions)
-n_distinct(positions)
+n_distinct(positions$Player)
+n_distinct(positions$Pos)
 positions <- positions %>% distinct(Player, .keep_all = TRUE)
 sum(is.na(positions$Player))
-positions[which(is.na(positions$Player)), ]
+positions[which(is.na(positions$Player)),]
 positions <- positions %>% drop_na() %>% mutate(rid = row_number())
 ##this was just a reference line of where the data came from in the totals df
 unique(unlist(str_split(positions$Player, "")))
@@ -53,9 +54,9 @@ bad_char <- positions[str_which(positions$Player, "[\\?\uFFFD]"),]
 #qmark_which <- str_which(positions$Player, "\\?")
 #positions$Player <- str_replace_all(positions$Player, "\\?", "")
 positions$Player <- if_else(str_detect(positions$Player, "\\?$"), str_replace(positions$Player, "\\?$", "c"), positions$Player)
-bad_char_which <- str_which(positions$Player, "[\\?\uFFFD]")
+#bad_char_which <- str_which(positions$Player, "[\\?\uFFFD]")
 bad_char_remain <- positions[str_which(positions$Player, "[\\?\uFFFD]"),]
-fixed_pname <- c("Alexis Ajinca", "Omer Asik", "Jose Calderon", "Francisco Garcia", "Manu Ginobili", "Jorge Gutierrez", "Nene Hilario", "Ersan Ilyasova", "Donatas Montiejunas", "Damjan Rudez", "Dennis Schroder", "Kevin Seraphin", "Hedu Turkoglu", "Jonas Valanciunas", "Anderson Varejao", "Greivis Vasquez", "Nikola Vucevic")
+fixed_pname <- c("Alexis Ajinca", "Omer Asik", "Jose Calderon", "Francisco Garcia", "Manu Ginobili", "Jorge Gutierrez", "Nene Hilario", "Ersan Ilyasova", "Donatas Motiejunas", "Damjan Rudez", "Dennis Schroder", "Kevin Seraphin", "Hedo Turkoglu", "Jonas Valanciunas", "Anderson Varejao", "Greivis Vasquez", "Nikola Vucevic")
 positions$Player <- plyr::mapvalues(positions$Player, from = bad_char_remain$Player, to = fixed_pname)
 #ufffd_player <- positions[str_which(positions$Player, "\uFFFD"), ]
 #ufffd_which <- str_which(positions$Player, "\uFFFD")
@@ -66,4 +67,9 @@ mult_pos <- positions[str_which(positions$Pos, "[^A-Z]"),]
 mult_pos1 <- positions[str_which(positions$Pos, ".{3,}"),]
 #although position does not guarentee height the further from the positions should represent "mismatch" scenarios, was unable to find player height in a useable format.
 #end note = go back and examine players with missing and/or incorrect characters to fix their names
+shots %>% group_by(player_name) %>% nest() %>% n_distinct(.$player_name)
+player_list <- shots %>% group_by(player_name) %>% summarize(cnt = sum(FGM))
+no_match <- shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name")
+no_match
+#recode the names without a match
 ```
