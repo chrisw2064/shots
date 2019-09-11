@@ -77,6 +77,7 @@ fixed_pname_2 <- c("Joe Ingles", "DeMarre Carroll", "Jimmer Fredette", "Monta El
 shots$player_name <- plyr::mapvalues(shots$player_name, from = no_match_shots$player_name, to = fixed_pname_2)
 shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name") %>% select(player_name)
 shots %>% group_by(player_name) %>% nest() %>% semi_join(positions, by = "player_name") %>% n_distinct(.$player_name)
+map(shots, ~sum(is.na(.))) %>% unlist()
 shots_nest_player <- shots %>% group_by(player_name) %>% nest()
 #recoded the names without a match then ensured that the join was successful, shots is now 
 ```
