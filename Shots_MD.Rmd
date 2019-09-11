@@ -69,7 +69,14 @@ mult_pos1 <- positions[str_which(positions$Pos, ".{3,}"),]
 #end note = go back and examine players with missing and/or incorrect characters to fix their names
 shots %>% group_by(player_name) %>% nest() %>% n_distinct(.$player_name)
 player_list <- shots %>% group_by(player_name) %>% summarize(cnt = sum(FGM))
-no_match <- shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name")
-no_match
-#recode the names without a match
+positions <- rename(positions, "player_name" = "Player")
+View(positions)
+no_match_shots <- shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name") %>% select(player_name)
+no_match_pos <- positions %>% anti_join(shots, by = "player_name") %>% select(player_name)
+fixed_pname_2 <- c("Joe Ingles", "DeMarre Carroll", "Jimmer Fredette", "Monta Ellis", "J.J. Barea", "Al-Farouq Aminu", "Dirk Nowitzki", "Kyle O'Quinn", "LeBron James", "C.J. Watson", "C.J. Miles", "Danilo Gallinari", "J.J. Hickson", "P.J. Tucker", "Nerlens Noel", "K.J. McDaniels", "JaKarr Sampson", "Luc Mbah a Moute", "O.J. Mayo", "Beno Udrih", "Amar'e Stoudemire", "Tim Hardaway", "D.J. Augustin", "Dwyane Wade", "Ray McCallum", "Ben McLemore", "DeMarcus Cousins", "Steven Adams", "J.J. Redick", "DeAndre Jordan", "CJ McCollum", "LaMarcus Aldridge", "Allen Crabbe", "Zach LaVine")
+shots$player_name <- plyr::mapvalues(shots$player_name, from = no_match_shots$player_name, to = fixed_pname_2)
+shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name") %>% select(player_name)
+shots %>% group_by(player_name) %>% nest() %>% semi_join(positions, by = "player_name") %>% n_distinct(.$player_name)
+shots_nest_player <- shots %>% group_by(player_name) %>% nest()
+#recoded the names without a match then ensured that the join was successful, shots is now 
 ```
