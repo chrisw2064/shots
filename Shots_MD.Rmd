@@ -39,6 +39,7 @@ head(positions)
 ```
 
 ```{r explore_data}
+library(lubridate)
 nrow(positions)
 n_distinct(positions$Player)
 n_distinct(positions$Pos)
@@ -82,16 +83,25 @@ shots %>% group_by(player_name) %>% nest() %>% semi_join(positions, by = "player
 #check some data quality starting with
 shots_ranges <- map(shots, ~range(.))
 shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5)
-#shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5))
+#shots <- shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5))
 shots_na <- map(shots, ~sum(is.na(.))) %>% unlist()
 #persumably these are situations in which the shot clock is off and game clock seems to be within quarter
 shots_ranges$GAME_CLOCK
 shots %>% mutate(game_time = (seconds(GAME_CLOCK)/60)) %>% filter(game_time > 24 & is.na(SHOT_CLOCK))
-#clearly many instances in which shot clock data is missing 
+#clearly many instances in which shot clock data is missing
+#shots <- shots %>% filter(!(game_time > 24 & is.na(SHOT_CLOCK)))
 shots_ranges$TOUCH_TIME
 shots %>% filter(TOUCH_TIME <= 0)
 shots %>% filter(TOUCH_TIME < 0)
+shots %>% filter(TOUCH_TIME == 0 & DRIBBLES > 0)
+shots %>% filter(TOUCH_TIME <= 0 & DRIBBLES > 0)
+shots %>% filter(TOUCH_TIME > 0) %>% group_by(DRIBBLES) %>% summarize(ave_tt = mean(TOUCH_TIME), sd_tt = sd(TOUCH_TIME), cnt = n()) %>% filter(cnt > 40)
+#knn imputation would be
+#library(VIM)
+#shots$TOUCH_TIME[shots$TOUCH_TIME <= 0 & shots$DRIBBLES > 0] <- NA
+#shots <- kNN(shots, variable = "TOUCH_TIME") but this does not take care of the large number of 0s
 #touch time should never be negative and the 3000 or so 0s is concerning
+#
 shots_nest_player <- shots %>% group_by(player_name) %>% nest() %>% left_join(positions, by = "player_name")
 #recoded the names without a match then ensured that the join was successful, shots is now 
 ```
