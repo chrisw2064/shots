@@ -115,12 +115,16 @@ shots_nest_player <- shots %>% group_by(player_name) %>% nest() %>% left_join(po
 #some exploratory visualizations and alterations
 ```{r exploratory visualizations}
 library(cowplot)
-colNames12 <- names(shots[,t])
+index1 <- map_lgl(shots, is.numeric)
+colNames12 <- names(shots[, index1])
 plot_lst <- list()
 for(i in colNames12){
   plt <- ggplot(shots, aes_string(x=i)) +
-    geom_density()
+    geom_histogram()
   plot_lst[[i]] <- plt
 }
 cowplot::plot_grid(plotlist = plot_lst, nrow = 4)
+map(plot_lst, print)
+#most games are close with bimodal around 0, some "step" patter in number of shots, very few overtime games, relatively normal distr of shot clock with many at 24 (likely off rebounds), most dribbles under 5 short touch time, shots seem to match "modern" nba with most either close or far with relatively few midrange, doesn't seem to be data error in reporting pts type (at least in putting a number other than 2 or 3), most shots occur with a defender with 5 or so feet, fgm is either 1 or 0
+colnames(shots[, !index1])
 ```
