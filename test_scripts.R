@@ -23,3 +23,9 @@ testdf <- data_frame(map_chr(test, 1),
   unique(shots[b, 15])
   
   shot_defender <- shots %>% group_by(CLOSEST_DEFENDER) %>% nest() %>% select(CLOSEST_DEFENDER)
+  #already did this first part earlier with n distinct and can probably just use duplicated with the id_name version
+  off_name <- shots %>% group_by(player_name) %>% nest() %>% select(player_name)
+  off_id_name <- shots %>% group_by(player_name, player_id) %>% nest() %>% select(player_name, player_id)
+  off_id_name$player_name[duplicated(off_id_name$player_name)]
+  sum(duplicated(off_id_name$player_name))
+  

@@ -107,18 +107,33 @@ summary(shots)
 #drop shots that aren't "realistic"
 shots %>% count(SHOT_DIST > 40)
 shots %>% count(SHOT_DIST == 0)
-#JUST DROP sho dist that equal 0
+#JUST DROP shot dist that equall 0
 #shots <- shots %>% filter(SHOT_DIST < 40)
 #
 #fix defender names
 coms <- str_which(shots$CLOSEST_DEFENDER, ",")
 all <- row_number(shots$CLOSEST_DEFENDER)
-no_coms <- setdiff(m, y)
+no_coms <- setdiff(all, coms)
 unique(shots[no_coms, 15])
-#u <- shots %>% group_by(CLOSEST_DEFENDER) %>% nest() %>% select(CLOSEST_DEFENDER)
-#test <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% nest() %>% select(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% group_by(CLOSEST_DEFENDER) %>% count(CLOSEST_DEFENDER_PLAYER_ID) %>% arrange(desc(`n`))
-#test[test$n > 1, ]
-#length(test$CLOSEST_DEFENDER_PLAYER_ID)
+shots$CLOSEST_DEFENDER <- str_replace(shots$CLOSEST_DEFENDER, "Nene", "Hilario, Nene")
+defend <- str_split(shots$CLOSEST_DEFENDER, ", ")
+  nms <- c("last_name", "first_name")
+  defenddf <- data_frame(map_chr(defend, 1),
+                       map_chr(defend, 2)) %>%
+    setNames(nms) %>%
+    mutate(player_name = str_c(first_name, last_name, sep = " "))
+  anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name)
+  ###drop atila dos santos shots - no proof he played
+no_match_defenders <- anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name)
+fixed_pname_def <- c("J.J. Barea", "C.J. Miles", "C.J. Watson", "J.J. Hickson", "Tim Hardaway", "J.J. Redick", "P.J. Tucker", "K.J. McDaniels", "C.J. Wilcox", "P.J. Hairston", "Jeffery Taylor", "Luigi Datome", "Chuck Hayes", "Glen Rice", "T.J. Warren", "Toure' Murry")
+#def_name <- shots %>% group_by(CLOSEST_DEFENDER) %>% nest() %>% select(CLOSEST_DEFENDER)
+#def_id_name <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% nest() %>% select(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) 
+#def_id_name$CLOSEST_DEFENDER[duplicated(def_id_name$CLOSEST_DEFENDER)]
+#quincy pondexterhas two assigned ids
+#off_name <- shots %>% group_by(player_name) %>% nest() %>% select(player_name)
+##off_id_name <- shots %>% group_by(player_name, player_id) %>% nest() %>% select(player_name, player_id)
+###off_id_name$player_name[duplicated(off_id_name$player_name)]
+####sum(duplicated(off_id_name$player_name))
 shots_nest_player <- shots %>% group_by(player_name) %>% nest() %>% left_join(positions, by = "player_name")
 #recoded the names without a match then ensured that the join was successful, shots is now nested
 ```
