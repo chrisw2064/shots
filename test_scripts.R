@@ -8,7 +8,7 @@ testdf <- data_frame(map_chr(test, 1),
 
 #defend_names <- str_split(shots$CLOSEST_DEFENDER, ", ") %>%
   transpose() %>% map( ~ unlist(.)) %>% setNames(nms) %>% as_tibble %>% mutate(player_name = str_c(first_name, last_name, sep = " "))
-  
+  shots$CLOSEST_DEFENDER <- str_replace(shots$CLOSEST_DEFENDER, "Nene", "Hilario, Nene")
   defend <- str_split(shots$CLOSEST_DEFENDER[b], ", ")
   nms <- c("last_name", "first_name")
   defenddf <- data_frame(map_chr(defend, 1),

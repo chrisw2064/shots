@@ -124,8 +124,14 @@ defend <- str_split(shots$CLOSEST_DEFENDER, ", ")
     mutate(player_name = str_c(first_name, last_name, sep = " "))
   anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name)
   ###drop atila dos santos shots - no proof he played
-no_match_defenders <- anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name)
+no_match_defenders <- anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name) %>% filter(player_name != "Atila Dos Santos")
 fixed_pname_def <- c("J.J. Barea", "C.J. Miles", "C.J. Watson", "J.J. Hickson", "Tim Hardaway", "J.J. Redick", "P.J. Tucker", "K.J. McDaniels", "C.J. Wilcox", "P.J. Hairston", "Jeffery Taylor", "Luigi Datome", "Chuck Hayes", "Glen Rice", "T.J. Warren", "Toure' Murry")
+defenddf$player_name<- plyr::mapvalues(defenddf$player_name, from = no_match_defenders$player_name, to = fixed_pname_def)
+shots <- shots %>% filter(CLOSEST_DEFENDER != "Dos Santos, Atila")
+defend1 <- str_split(shots$CLOSEST_DEFENDER, ", ")
+shots <- shots %>% mutate(last_name = map_chr(defend1, 1), first_name = map_chr(defend1, 2))
+shots$CLOSEST_DEFENDER <- str_c(shots$first_name, shots$last_name, sep = " ")
+#####now join positions to defender names
 #def_name <- shots %>% group_by(CLOSEST_DEFENDER) %>% nest() %>% select(CLOSEST_DEFENDER)
 #def_id_name <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% nest() %>% select(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) 
 #def_id_name$CLOSEST_DEFENDER[duplicated(def_id_name$CLOSEST_DEFENDER)]
