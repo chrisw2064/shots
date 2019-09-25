@@ -135,16 +135,14 @@ shots$CLOSEST_DEFENDER<- plyr::mapvalues(shots$CLOSEST_DEFENDER, from = no_match
 #####now join positions to defender names
 anti_join(shots, positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% select(CLOSEST_DEFENDER)
 
-#def_name <- shots %>% group_by(CLOSEST_DEFENDER) %>% nest() %>% select(CLOSEST_DEFENDER)
-#def_id_name <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% nest() %>% select(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) 
-#def_id_name$CLOSEST_DEFENDER[duplicated(def_id_name$CLOSEST_DEFENDER)]
+#dup_def <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% count()
+#dup_def$CLOSEST_DEFENDER[duplicated(dup_def$CLOSEST_DEFENDER)]
 #quincy pondexterhas two assigned ids
-#off_name <- shots %>% group_by(player_name) %>% nest() %>% select(player_name)
-##off_id_name <- shots %>% group_by(player_name, player_id) %>% nest() %>% select(player_name, player_id)
-###off_id_name$player_name[duplicated(off_id_name$player_name)]
-####sum(duplicated(off_id_name$player_name))
-shots_updated <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name"))
-##there is a position and rid for both need to rename the variables...
+#dup_shooter <- shots %>% group_by(player_name, player_id) %>% count()
+#dup_shooter$player_name[duplicated(dup_shooter$player_name)]
+#no duplicated shooters
+shots_updated <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x")
+#
 #recoded the names without a match then ensured that the join was successful
 ```
 #some exploratory visualizations and alterations
