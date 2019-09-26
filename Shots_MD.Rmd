@@ -20,70 +20,67 @@ Note that the `echo = FALSE` parameter was added to the code chunk to prevent pr
 
 ```{r read_data}
 shots <- read_csv("nba_shots.csv")
-player_names <- map_chr(shots$player_name, str_to_title)
-shots$player_name <- player_names
-# wait on this shots <- shots %>% mutate_if(is.character, as.factor)
+summary(shots)
 str(shots)
-shots_nested <- shots %>% group_by(GAME_ID) %>% nest()
+shots <- shots %>% mutate(player_name = map_chr(shots$player_name, str_to_title))
 totals <- read_csv("totals_1415.csv")
+str(totals)
 into_names <- names(totals) %>% str_split(",") %>% .[[1]]
 names(totals) <- "x"
 totals <- totals %>% separate(x, into_names, sep = ",")
-totals <- as_data_frame(totals)
+totals <- as_tibble(totals)
 head(totals)
 positions <- totals %>% select(c("Player", "Pos"))
-head(positions)
-## checking for missing values and get a sense of what is going on with the data including
-## some exploratory analysis and visualization but also want to join with positions so 
-## that the nearest defender length/size can be included
 ```
 
-```{r explore_data}
+```{r explore_data_positions}
+##need lubridate because GAME_CLOCK is time
 library(lubridate)
-nrow(positions)
-n_distinct(positions$Player)
-n_distinct(positions$Pos)
+summary(positions)
+nrow(positions) - n_distinct(positions$Player) #duplicate players from being on different teams
+n_distinct(positions$Pos) #will need to handle this later, there are dual positions
+#Keeping only distinct players because I just want position info
 positions <- positions %>% distinct(Player, .keep_all = TRUE)
 sum(is.na(positions$Player))
 positions[which(is.na(positions$Player)),]
 positions <- positions %>% drop_na() %>% mutate(rid = row_number())
-##this was just a reference line of where the data came from in the totals df
+##dropped a reference line of where the data came from while adding a row id number "unique identifier"
+#checking to see what characters are part of player column
 unique(unlist(str_split(positions$Player, "")))
+positions[str_which(positions$Player, "\\\\.*"),]
+## "\\appears before some kind of id name for all players so I want to remove this and the id name"
 positions$Player <- str_replace_all(positions$Player, "\\\\.*", "")
+#accent marks are not represented so index these
 bad_char <- positions[str_which(positions$Player, "[\\?\uFFFD]"),]
-#qmark_player <- positions[str_which(positions$Player, "\\?"),]
-#qmark_which <- str_which(positions$Player, "\\?")
-#positions$Player <- str_replace_all(positions$Player, "\\?", "")
+#after a quick view, "?" at the end is a "c"
 positions$Player <- if_else(str_detect(positions$Player, "\\?$"), str_replace(positions$Player, "\\?$", "c"), positions$Player)
-#bad_char_which <- str_which(positions$Player, "[\\?\uFFFD]")
+#index what is remaining and there isn't any real overlap to allow for an effective ifelse...
 bad_char_remain <- positions[str_which(positions$Player, "[\\?\uFFFD]"),]
 fixed_pname <- c("Alexis Ajinca", "Omer Asik", "Jose Calderon", "Francisco Garcia", "Manu Ginobili", "Jorge Gutierrez", "Nene Hilario", "Ersan Ilyasova", "Donatas Motiejunas", "Damjan Rudez", "Dennis Schroder", "Kevin Seraphin", "Hedo Turkoglu", "Jonas Valanciunas", "Anderson Varejao", "Greivis Vasquez", "Nikola Vucevic")
 positions$Player <- plyr::mapvalues(positions$Player, from = bad_char_remain$Player, to = fixed_pname)
-#ufffd_player <- positions[str_which(positions$Player, "\uFFFD"), ]
-#ufffd_which <- str_which(positions$Player, "\uFFFD")
-#positions$Player <- str_replace_all(positions$Player, "\uFFFD", "")
+#check what characters remain
 unique(unlist(str_split(positions$Player, "")))
-View(positions)
-mult_pos <- positions[str_which(positions$Pos, "[^A-Z]"),]
-mult_pos1 <- positions[str_which(positions$Pos, ".{3,}"),]
+#fix players with multiple positions
+positions[str_which(positions$Pos, ".{3,}"),]
 positions$Pos <- str_replace_all(positions$Pos, "^(..)-(..)$", "\\1")
-#although position does not guarentee height the further from the positions should represent "mismatch" scenarios, was unable to find player height in a useable format.
-#end note = go back and examine players with missing and/or incorrect characters to fix their names
-shots %>% group_by(player_name) %>% nest() %>% n_distinct(.$player_name)
-player_list <- shots %>% group_by(player_name) %>% summarize(cnt = sum(FGM))
+#although position does not guarentee height, speed, etc..., greater "distance" between the positions of shooters and defenders should represent "mismatch" scenarios.
+#prepare for merging
 positions <- rename(positions, "player_name" = "Player")
-View(positions)
-no_match_shots <- shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name") %>% select(player_name)
-no_match_pos <- positions %>% anti_join(shots, by = "player_name") %>% select(player_name)
+```
+###now move onto shots...
+```{r explore_data_shots}
+n_distinct(shots$player_name)
+player_list_shooter <- shots %>% distinct(player_name)
+no_match_shots <- player_list_shooter %>% anti_join(positions, by = "player_name")
 fixed_pname_2 <- c("Joe Ingles", "DeMarre Carroll", "Jimmer Fredette", "Monta Ellis", "J.J. Barea", "Al-Farouq Aminu", "Dirk Nowitzki", "Kyle O'Quinn", "LeBron James", "C.J. Watson", "C.J. Miles", "Danilo Gallinari", "J.J. Hickson", "P.J. Tucker", "Nerlens Noel", "K.J. McDaniels", "JaKarr Sampson", "Luc Mbah a Moute", "O.J. Mayo", "Beno Udrih", "Amar'e Stoudemire", "Tim Hardaway", "D.J. Augustin", "Dwyane Wade", "Ray McCallum", "Ben McLemore", "DeMarcus Cousins", "Steven Adams", "J.J. Redick", "DeAndre Jordan", "CJ McCollum", "LaMarcus Aldridge", "Allen Crabbe", "Zach LaVine")
 shots$player_name <- plyr::mapvalues(shots$player_name, from = no_match_shots$player_name, to = fixed_pname_2)
 #check the success of the join
-shots %>% group_by(player_name) %>% nest() %>% anti_join(positions, by = "player_name") %>% select(player_name)
-shots %>% group_by(player_name) %>% nest() %>% semi_join(positions, by = "player_name") %>% n_distinct(.$player_name)
+shots %>% distinct(player_name) %>% anti_join(positions, by = "player_name")
 #check some data quality starting with
-shots_ranges <- map(shots, ~range(.))
-shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5)
-#shots <- shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5)) or just recode them to twos
+####
+shots_ranges <- tibble(rg = map(shots, ~range(.))) %>%
+  mutate(var_name = map(rg,1), value = map(rg, 2))
+####
 shots_na <- map(shots, ~sum(is.na(.))) %>% unlist()
 #persumably these are situations in which the shot clock is off and game clock seems to be within quarter
 shots_ranges$GAME_CLOCK
@@ -104,7 +101,11 @@ shots %>% filter(TOUCH_TIME > 0) %>% group_by(DRIBBLES) %>% summarize(ave_tt = m
 #could also used the means like in the line above, but knn produces consistently lower values and sd tends to be greater than 1 but around 1.15-1.35 for each dribble
 #
 summary(shots)
-#drop shots that aren't "realistic"
+#drop shots that aren't "realistic" or consistent with pts type
+#all shots are within allowed range
+shots_ranges$SHOT_DIST
+shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5)
+#shots <- shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5)) or just recode them to twos
 shots %>% count(SHOT_DIST > 40)
 shots %>% count(SHOT_DIST == 0)
 #JUST DROP shot dist that equall 0
@@ -144,6 +145,8 @@ anti_join(shots, positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% sele
 shots_updated <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x")
 #
 #recoded the names without a match then ensured that the join was successful
+#
+# will need to do this shots <- shots %>% mutate_if(is.character, as.factor)
 ```
 #some exploratory visualizations and alterations
 ```{r exploratory visualizations}
