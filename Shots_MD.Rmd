@@ -77,32 +77,66 @@ shots$player_name <- plyr::mapvalues(shots$player_name, from = no_match_shots$pl
 #check the success of the join
 shots %>% distinct(player_name) %>% anti_join(positions, by = "player_name")
 #check some data quality starting with
-####
-shots_ranges <- tibble(rg = map(shots, ~range(.))) %>%
-  mutate(var_name = map(rg,1), value = map(rg, 2))
-####
+#ranges
+shots_ranges <- map(shots, ~range(.))
+#NAs
 shots_na <- map(shots, ~sum(is.na(.))) %>% unlist()
-#persumably these are situations in which the shot clock is off and game clock seems to be within quarter
+#shot_clock is the only column with NAs
+#persumably these are mostly situations in which the shot clock is off (i.e., end of quarters)
 shots_ranges$GAME_CLOCK
-shots %>% mutate(game_time = (seconds(GAME_CLOCK)/60)) %>% filter(game_time > 24 & is.na(SHOT_CLOCK))
-#clearly many instances in which shot clock data is missing
-#shots <- shots %>% filter(!(game_time > 24 & is.na(SHOT_CLOCK)))
+#time difference in seconds, but parsed as hours, minutes, seconds
+#game clock is measured within quarter (would need to pair with period to get game time across quarters)
+shots <- shots %>% mutate(qtr_seconds = (seconds(GAME_CLOCK)/60))
+shots %>% filter(qtr_seconds > 24 & is.na(SHOT_CLOCK))
+#clearly many instances in which shot clock data is missing and is NOT the end of a quarter
+#it is possible that these situations represent "immediate" putbacks or shots off of rebounds when shot clock gets reset (but shot clock should still be recorded) or shots off of turnovers or shots "launched" from across court
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME <= 1) %>% nrow(.)
+#this would "save" 783 shots/rows of data by allowing for no reset of the shot clock on a "fast" rebound+shot or a loose ball and then fast shot
+#could also filter by dribbles b/c shot clock should have time to reset when dribble is greater than zero or 1
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME <= 1 & DRIBBLES >= 1) %>% group_by(DRIBBLES) %>% tally()
+#there are 14 such cases but because touch time is less than or equal to 1 and dribbles is not greater than 1 (which would suggest an error in the data) these cases can be kept
+#but lets look at what those "fast" shots are like
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME <= 1) %>%
+  ggplot(aes(SHOT_DIST)) +
+  geom_freqpoly()
+#the distribution of fast shots seems to match that of all shots in terms of shot distance
+#what about the others that don't seem to fit within a "fast" shot
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME > 1)
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME > 1) %>% group_by(player_name) %>% tally() %>% arrange(desc(`n`))
+#this isn't an issue for one player or group of players, almost all players 
+shots %>% filter(is.na(SHOT_CLOCK) & qtr_seconds > 24 & TOUCH_TIME > 1) %>%
+  ggplot(aes(SHOT_DIST)) +
+  geom_freqpoly()
+#dropping all of these would be over 1200 shots
+shots <- shots %>% filter(!(qtr_seconds > 24 & is.na(SHOT_CLOCK) & TOUCH_TIME > 1))
+#now the NAs can be replaced with a "shot clock" vlaue based on game clock if needed
+#may not want to do this yet with end of quarter, shot clock "off" shots, but can do it for "fast shots" assigning a 24 when appropriate 
+shots[is.na(shots$SHOT_CLOCK) & shots$qtr_seconds > 24, 9] <- 24
 shots_ranges$TOUCH_TIME
-shots %>% filter(TOUCH_TIME <= 0)
-shots %>% filter(TOUCH_TIME < 0)
+#a touch time of 0 isn't necessarily an error if it is measured as touch time other than shooting
+#because there was no description of what touch time represents I will explore
+#negative touch time is not possible and must be an error and should be dropped (lose over 300 shots)
+shots %>% filter(TOUCH_TIME < 0) %>% nrow(.)
+shots <- shots %>% filter(TOUCH_TIME >= 0)
+shots %>% filter(TOUCH_TIME == 0)
 shots %>% filter(TOUCH_TIME == 0 & DRIBBLES > 0)
-shots %>% filter(TOUCH_TIME <= 0 & DRIBBLES > 0)
-shots %>% filter(TOUCH_TIME > 0) %>% group_by(DRIBBLES) %>% summarize(ave_tt = mean(TOUCH_TIME), sd_tt = sd(TOUCH_TIME), cnt = n()) %>% filter(cnt > 40)
+#only a couple of instances where dribble is more than 1, but only 10 instances total
+#the 1 dribbles will remain because those are "realistic" based on game time, shot clock, etc...
+#the 2 and 3 dribble cases will be dropped
+shots <- shots %>% filter(!(TOUCH_TIME == 0 & DRIBBLES > 1))
+#IF going to replace with mean
+###shots %>% filter(TOUCH_TIME > 0) %>% group_by(DRIBBLES) %>% summarize(ave_tt = mean(TOUCH_TIME), sd_tt = sd(TOUCH_TIME), cnt = n()) %>% filter(cnt > 40)
 #knn imputation would be
 #library(VIM)
 #shots$TOUCH_TIME[shots$TOUCH_TIME <= 0 & shots$DRIBBLES > 0] <- NA
 #shots <- kNN(shots, variable = "TOUCH_TIME") but this does not take care of the large number of 0s
-#touch time should never be negative and the 3000 or so 0s is concerning
+#touch time should never be negative and the 3000 or so 0s is concerning if it supposed to include shooting time;
+##however those probably represent tips or catch and shoot situations
 #could also used the means like in the line above, but knn produces consistently lower values and sd tends to be greater than 1 but around 1.15-1.35 for each dribble
-#
-summary(shots)
+########
+#########
 #drop shots that aren't "realistic" or consistent with pts type
-#all shots are within allowed range
+#all shots are within length of the court
 shots_ranges$SHOT_DIST
 shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5)
 #shots <- shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5)) or just recode them to twos

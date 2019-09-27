@@ -29,3 +29,12 @@ testdf <- data_frame(map_chr(test, 1),
   off_id_name$player_name[duplicated(off_id_name$player_name)]
   sum(duplicated(off_id_name$player_name))
   
+
+  mutate_nas <- function(.data, condition) {
+    condition <- eval(substitute(condition), .data, envir)
+    .data[condition, ] <- .data[condition, ] %>% mutate(...)
+    .data
+  }
+  data <- data %>% 
+    mutate_nas( desc == "blank", x = NA, y = NA, z = NA)
+  
