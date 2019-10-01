@@ -133,35 +133,48 @@ shots <- shots %>% filter(!(TOUCH_TIME == 0 & DRIBBLES > 1))
 #touch time should never be negative and the 3000 or so 0s is concerning if it supposed to include shooting time;
 ##however those probably represent tips or catch and shoot situations
 #could also used the means like in the line above, but knn produces consistently lower values and sd tends to be greater than 1 but around 1.15-1.35 for each dribble
-########
-#########
 #drop shots that aren't "realistic" or consistent with pts type
 #all shots are within length of the court
 shots_ranges$SHOT_DIST
-shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5)
-#shots <- shots %>% filter(!(PTS_TYPE == 3 & SHOT_DIST < 21.5)) or just recode them to twos
-shots %>% count(SHOT_DIST > 40)
-shots %>% count(SHOT_DIST == 0)
-#JUST DROP shot dist that equall 0
-#shots <- shots %>% filter(SHOT_DIST < 40)
+#appears all shots are from half court or closer
+#no information avaialble for the shots data set about how shot_dist is measured
+#corner threes are 22ft from the center of the rim to the line, which allows for instances of three pt shots shorter than 22 (e.g., foot on the line but called a three, shot_dist is measured from "front" of the rim)
+shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21) %>% nrow(.)
+shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5) %>% nrow(.)
+shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 22) %>% nrow(.)
+shots %>% filter(PTS_TYPE == PTS) %>% group_by(SHOT_RESULT) %>% count()
+#pts_type and pts match unless the shot was missed
+#It is possible that pts_type is not a useful predictor beyond a measure of distance etc...
+#so I can choose to drop some or all or just drop "obvious" errors and recode others or not include pts_type in the model at all
+#######
+shots %>% filter(SHOT_DIST > 40) %>% nrow(.)
+#even at 40 ft this isn't a "realistic" or "common" shot so these shots will be dropped as "outliers"
+shots %>% filter(SHOT_DIST < 1) %>% nrow(.)
+#0 isn't a meaningful shot distance and doesn't represent tip-ins there should be more than 4 if that were the case
+shots <- shots %>% filter(!(SHOT_DIST > 40 | SHOT_DIST == 0))
 #
 #fix defender names
-coms <- str_which(shots$CLOSEST_DEFENDER, ",")
+shots_ranges$CLOSEST_DEFENDER
+#defender names do not match the format of player name
+#check that all defender names are in the same format
+commas <- str_which(shots$CLOSEST_DEFENDER, ",")
 all <- row_number(shots$CLOSEST_DEFENDER)
-no_coms <- setdiff(all, coms)
-unique(shots[no_coms, 15])
+no_commas <- setdiff(all, commas)
+unique(shots[no_commas, 15])
+#nene is one name without comma
+#fix nene in order to reformat all names
 shots$CLOSEST_DEFENDER <- str_replace(shots$CLOSEST_DEFENDER, "Nene", "Hilario, Nene")
 defend <- str_split(shots$CLOSEST_DEFENDER, ", ")
   nms <- c("last_name", "first_name")
-  defenddf <- data_frame(map_chr(defend, 1),
+  defender_names <- data_frame(map_chr(defend, 1),
                        map_chr(defend, 2)) %>%
     setNames(nms) %>%
     mutate(player_name = str_c(first_name, last_name, sep = " "))
-  anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name)
+  anti_join(defender_names, positions, by = "player_name") %>% distinct(player_name)
   ###drop atila dos santos shots - no proof he played
-no_match_defenders <- anti_join(defenddf, positions, by = "player_name") %>% distinct(player_name) %>% filter(player_name != "Atila Dos Santos")
+no_match_defenders <- anti_join(defender_names, positions, by = "player_name") %>% distinct(player_name) %>% filter(player_name != "Atila Dos Santos")
 fixed_pname_def <- c("J.J. Barea", "C.J. Miles", "C.J. Watson", "J.J. Hickson", "Tim Hardaway", "J.J. Redick", "P.J. Tucker", "K.J. McDaniels", "C.J. Wilcox", "P.J. Hairston", "Jeffery Taylor", "Luigi Datome", "Chuck Hayes", "Glen Rice", "T.J. Warren", "Toure' Murry")
-defenddf$player_name<- plyr::mapvalues(defenddf$player_name, from = no_match_defenders$player_name, to = fixed_pname_def)
+defender_names$player_name<- plyr::mapvalues(defender_names$player_name, from = no_match_defenders$player_name, to = fixed_pname_def)
 shots <- shots %>% filter(CLOSEST_DEFENDER != "Dos Santos, Atila")
 defend1 <- str_split(shots$CLOSEST_DEFENDER, ", ")
 shots <- shots %>% mutate(last_name = map_chr(defend1, 1), first_name = map_chr(defend1, 2))
@@ -169,14 +182,8 @@ shots$CLOSEST_DEFENDER <- str_c(shots$first_name, shots$last_name, sep = " ")
 shots$CLOSEST_DEFENDER<- plyr::mapvalues(shots$CLOSEST_DEFENDER, from = no_match_defenders$player_name, to = fixed_pname_def)
 #####now join positions to defender names
 anti_join(shots, positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% select(CLOSEST_DEFENDER)
-
-#dup_def <- shots %>% group_by(CLOSEST_DEFENDER, CLOSEST_DEFENDER_PLAYER_ID) %>% count()
-#dup_def$CLOSEST_DEFENDER[duplicated(dup_def$CLOSEST_DEFENDER)]
-#quincy pondexterhas two assigned ids
-#dup_shooter <- shots %>% group_by(player_name, player_id) %>% count()
-#dup_shooter$player_name[duplicated(dup_shooter$player_name)]
-#no duplicated shooters
-shots_updated <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x")
+#player_id and defender_id are not being used, but there was a duplicate defender_id for quincy pondexter...
+shots <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x")
 #
 #recoded the names without a match then ensured that the join was successful
 #
@@ -185,6 +192,8 @@ shots_updated <- shots %>% left_join(positions, by = "player_name") %>% left_joi
 #some exploratory visualizations and alterations
 ```{r exploratory visualizations}
 library(cowplot)
+#some crude, but potentially useful plots
+#cowplot is easy to view on one page, but will also loop through multiple pages
 index1 <- map_lgl(shots, is.numeric)
 names12 <- names(shots[, index1])
 plot_lst <- list()
@@ -197,4 +206,18 @@ cowplot::plot_grid(plotlist = plot_lst, nrow = 4)
 map(plot_lst, print)
 #most games are close with bimodal around 0, some "step" patter in number of shots, very few overtime games, relatively normal distr of shot clock with many at 24 (likely off rebounds), most dribbles under 5 short touch time, shots seem to match "modern" nba with most either close or far with relatively few midrange, doesn't seem to be data error in reporting pts type (at least in putting a number other than 2 or 3), most shots occur with a defender with 5 or so feet, fgm is either 1 or 0
 colnames(shots[, !index1])
+```
+#some modeling "doodles"
+```{r modelling_begins}
+library(caret)
+###logistic regression without creating anykind of position variable, just an interaction
+shots <- shots %>% mutate(SHOT_NUMERIC = as.numeric(SHOT_RESULT == "made"))
+test_index_glm <- createDataPartition(shots$SHOT_NUMERIC, times = 1, p = 0.5, list = FALSE)
+train_set_glm_shots <- shots %>% slice(-test_index_glm)
+test_set_glm_shots <- shots %>% slice(test_index_glm)
+#now fit a model
+fit_glm_shots <- glm(SHOT_NUMERIC ~ GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSE_DEF_DIST + POS_DEF*POS_SHOOTER, data = train_set_glm_shots, family = "binomial")
+p_hat_glm_shots <- predict(fit_glm_shots, test_set_glm_shots)
+y_hat_glm_shots <- factor(ifelse(p_hat_glm_shots > 0.5, "made", "missed"))
+confusionMatrix(data = y_hat_glm_shots, reference = test_set_glm_shots$SHOT_RESULT)
 ```
