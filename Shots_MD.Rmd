@@ -192,20 +192,27 @@ shots <- shots %>% left_join(positions, by = "player_name") %>% left_join(positi
 #some exploratory visualizations and alterations
 ```{r exploratory visualizations}
 library(cowplot)
+library(GGally)
 #some crude, but potentially useful plots
 #cowplot is easy to view on one page, but will also loop through multiple pages
-index1 <- map_lgl(shots, is.numeric)
-names12 <- names(shots[, index1])
+index_num <- map_lgl(shots, is.numeric)
+names_num <- names(shots[, index_num])
 plot_lst <- list()
-for(i in names12){
+for(i in names_num){
   plt <- ggplot(shots, aes_string(x=i)) +
     geom_histogram()
   plot_lst[[i]] <- plt
 }
 cowplot::plot_grid(plotlist = plot_lst, nrow = 4)
-map(plot_lst, print)
+list_num_plots <- map(plot_lst, print)
 #most games are close with bimodal around 0, some "step" patter in number of shots, very few overtime games, relatively normal distr of shot clock with many at 24 (likely off rebounds), most dribbles under 5 short touch time, shots seem to match "modern" nba with most either close or far with relatively few midrange, doesn't seem to be data error in reporting pts type (at least in putting a number other than 2 or 3), most shots occur with a defender with 5 or so feet, fgm is either 1 or 0
-colnames(shots[, !index1])
+#now look at "important" variables
+names_num_variables <- names_num[-c(1, 2, 14, 16, 17)]
+cor(shots[, names_num_variables], use = "complete.obs")
+ggcorr(shots[, names_num_variables])
+ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
+  geom_point()
+colnames(shots[, !index_num])
 ```
 #some modeling "doodles"
 ```{r modelling_begins}
