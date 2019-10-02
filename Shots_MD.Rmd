@@ -142,10 +142,15 @@ shots_ranges$SHOT_DIST
 shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21) %>% nrow(.)
 shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 21.5) %>% nrow(.)
 shots %>% filter(PTS_TYPE == 3 & SHOT_DIST < 22) %>% nrow(.)
+shots %>% filter(PTS_TYPE == 2 & SHOT_DIST > 24) %>% nrow(.)
 shots %>% filter(PTS_TYPE == PTS) %>% group_by(SHOT_RESULT) %>% count()
 #pts_type and pts match unless the shot was missed
 #It is possible that pts_type is not a useful predictor beyond a measure of distance etc...
-#so I can choose to drop some or all or just drop "obvious" errors and recode others or not include pts_type in the model at all
+#so I can choose to drop some or all or just drop "obvious" errors and recode others or not include pts_type in the model at all, but its probably best to recode and preserve as much data as possible
+#recoding
+###### check this...
+shots[shots$PTS_TYPE == 2 & shots$SHOT_DIST > 24, 13] <- 3
+shots[shots$PTS_TYPE == 3 & shots$SHOT_DIST < 21.5, 13] <- 2
 #######
 shots %>% filter(SHOT_DIST > 40) %>% nrow(.)
 #even at 40 ft this isn't a "realistic" or "common" shot so these shots will be dropped as "outliers"
@@ -207,11 +212,13 @@ cowplot::plot_grid(plotlist = plot_lst, nrow = 4)
 list_num_plots <- map(plot_lst, print)
 #most games are close with bimodal around 0, some "step" patter in number of shots, very few overtime games, relatively normal distr of shot clock with many at 24 (likely off rebounds), most dribbles under 5 short touch time, shots seem to match "modern" nba with most either close or far with relatively few midrange, doesn't seem to be data error in reporting pts type (at least in putting a number other than 2 or 3), most shots occur with a defender with 5 or so feet, fgm is either 1 or 0
 #now look at "important" variables
-names_num_variables <- names_num[-c(1, 2, 14, 16, 17)]
+names_num_variables <- names_num[-c(1, 2, 10, 14, 16, 17)]
 cor(shots[, names_num_variables], use = "complete.obs")
-ggcorr(shots[, names_num_variables])
+ggcorr(shots[, names_num_variables], label = TRUE, hjust = 0.75, size = 3, layout.exp = 2)
 ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
   geom_point()
+ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
+  geom_point(aes(color = PTS_TYPE))
 colnames(shots[, !index_num])
 ```
 #some modeling "doodles"
