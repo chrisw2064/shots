@@ -148,15 +148,17 @@ shots %>% filter(PTS_TYPE == PTS) %>% group_by(SHOT_RESULT) %>% count()
 #It is possible that pts_type is not a useful predictor beyond a measure of distance etc...
 #so I can choose to drop some or all or just drop "obvious" errors and recode others or not include pts_type in the model at all, but its probably best to recode and preserve as much data as possible
 #recoding
-###### check this...
+#in both cases of recoding pts_type it is difficult to decide on a cutoff, but the longest point of the nba 3pt line is 23'9" and the shortest is 22' so given the possibility that the shot distance is measured to the front of the rim (not the center of the basket like the 3pt line) some what conservative cutoffs will be used
 shots[shots$PTS_TYPE == 2 & shots$SHOT_DIST > 24, 13] <- 3
 shots[shots$PTS_TYPE == 3 & shots$SHOT_DIST < 21.5, 13] <- 2
-#######
-shots %>% filter(SHOT_DIST > 40) %>% nrow(.)
-#even at 40 ft this isn't a "realistic" or "common" shot so these shots will be dropped as "outliers"
+#Although all shots are recorded as no farther than half court, at least some of those shots don't represent "meaningful" attempts - that is, shots around half court are not part of any offensive scheme and even the best shooters typically don't shoot from further than 30 feet (with some exceptions)
+shots %>% group_by(PTS_TYPE) %>% summarize(ave_dist = mean(SHOT_DIST), sd_dist = sd(SHOT_DIST))
+#To be conservative and keep shots within about 4 sds of the mean 3pt distance places the cutoff at 32
+shots %>% filter(SHOT_DIST > 32) %>% group_by(player_name) %>% count() %>% arrange(desc(`n`))
+shots %>% filter(SHOT_DIST > 32) %>% nrow(.)
 shots %>% filter(SHOT_DIST < 1) %>% nrow(.)
 #0 isn't a meaningful shot distance and doesn't represent tip-ins there should be more than 4 if that were the case
-shots <- shots %>% filter(!(SHOT_DIST > 40 | SHOT_DIST == 0))
+shots <- shots %>% filter(!(SHOT_DIST > 32 | SHOT_DIST == 0))
 #
 #fix defender names
 shots_ranges$CLOSEST_DEFENDER
@@ -188,9 +190,12 @@ shots$CLOSEST_DEFENDER<- plyr::mapvalues(shots$CLOSEST_DEFENDER, from = no_match
 #####now join positions to defender names
 anti_join(shots, positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% select(CLOSEST_DEFENDER)
 #player_id and defender_id are not being used, but there was a duplicate defender_id for quincy pondexter...
-shots <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x")
+shots <- shots %>% left_join(positions, by = "player_name") %>% left_join(positions, by = c("CLOSEST_DEFENDER" = "player_name")) %>% rename("POS_DEF" = "Pos.y", "POS_SHOOTER" = "Pos.x", "rid_DEF" = "rid.y", "rid_SHOOTER" = "rid.x") %>% select(-c(last_name, first_name, player_id, CLOSEST_DEFENDER_PLAYER_ID))
+#i want to create a "mismatch" measure from position. I will attempt to keep it as simple as possible but will do some exploring.
+shots$POS_SHOOTER <- case_when(shots$POS_SHOOTER == "PG" ~ 1, shots$POS_SHOOTER == "SG" ~ 2, shots$POS_SHOOTER == "SF" ~ 3, shots$POS_SHOOTER == "PF" ~ 4, shots$POS_SHOOTER == "C" ~ 5)
+shots$POS_DEF <- case_when(shots$POS_DEF == "PG" ~ 1, shots$POS_DEF == "SG" ~ 2, shots$POS_DEF == "SF" ~ 3, shots$POS_DEF == "PF" ~ 4, shots$POS_DEF == "C" ~ 5)
+shots <- shots %>% mutate(MISMATCH = POS_SHOOTER - POS_DEF)
 #
-#recoded the names without a match then ensured that the join was successful
 #
 # will need to do this shots <- shots %>% mutate_if(is.character, as.factor)
 ```
@@ -217,21 +222,32 @@ cor(shots[, names_num_variables], use = "complete.obs")
 ggcorr(shots[, names_num_variables], label = TRUE, hjust = 0.75, size = 3, layout.exp = 2)
 ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
   geom_point()
-ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
+shots %>% mutate_at("PTS_TYPE", as.factor) %>%
+  ggplot(aes(SHOT_DIST, CLOSE_DEF_DIST)) +
   geom_point(aes(color = PTS_TYPE))
+shots %>% mutate_at("PTS_TYPE", as.factor) %>%
+  ggplot(aes(PTS_TYPE, CLOSE_DEF_DIST)) +
+  geom_violin()
+shots %>%
+  ggplot(aes(TOUCH_TIME, CLOSE_DEF_DIST)) +
+  geom_point()
+shots %>%
+  ggplot(aes(SHOT_DIST, TOUCH_TIME)) +
+  geom_point()
 colnames(shots[, !index_num])
 ```
 #some modeling "doodles"
 ```{r modelling_begins}
 library(caret)
 ###logistic regression without creating anykind of position variable, just an interaction
-shots <- shots %>% mutate(SHOT_NUMERIC = as.numeric(SHOT_RESULT == "made"))
+shots <- shots %>% mutate_at("SHOT_RESULT", as.factor) %>% mutate(SHOT_NUMERIC = as.numeric(SHOT_RESULT == "made"))
 test_index_glm <- createDataPartition(shots$SHOT_NUMERIC, times = 1, p = 0.5, list = FALSE)
 train_set_glm_shots <- shots %>% slice(-test_index_glm)
 test_set_glm_shots <- shots %>% slice(test_index_glm)
 #now fit a model
-fit_glm_shots <- glm(SHOT_NUMERIC ~ GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSE_DEF_DIST + POS_DEF*POS_SHOOTER, data = train_set_glm_shots, family = "binomial")
+fit_glm_shots <- glm(SHOT_NUMERIC ~ GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + PTS_TYPE + CLOSE_DEF_DIST*SHOT_DIST*MISMATCH, data = train_set_glm_shots, family = "binomial")
 p_hat_glm_shots <- predict(fit_glm_shots, test_set_glm_shots)
 y_hat_glm_shots <- factor(ifelse(p_hat_glm_shots > 0.5, "made", "missed"))
+summary(fit_glm_shots)
 confusionMatrix(data = y_hat_glm_shots, reference = test_set_glm_shots$SHOT_RESULT)
 ```
