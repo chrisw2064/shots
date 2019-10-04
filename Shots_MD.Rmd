@@ -225,15 +225,42 @@ ggplot(shots, aes(SHOT_DIST, CLOSE_DEF_DIST)) +
 shots %>% mutate_at("PTS_TYPE", as.factor) %>%
   ggplot(aes(SHOT_DIST, CLOSE_DEF_DIST)) +
   geom_point(aes(color = PTS_TYPE))
+##it seems that as shot distance increases so does the distance of the defender (except very close to basket, which is likley to represent breakaways and/or defensive breakdowns/miscommunications), until the three point line and then from there denfender tend to be closer for deeper shots
 shots %>% mutate_at("PTS_TYPE", as.factor) %>%
   ggplot(aes(PTS_TYPE, CLOSE_DEF_DIST)) +
   geom_violin()
+#however defenders still tend to be further away for 3pt shots, but not necessarily for "deep" 3pt shots 
 shots %>%
   ggplot(aes(TOUCH_TIME, CLOSE_DEF_DIST)) +
   geom_point()
+#very few long touch times when a defender is far away (some might represent end of game situations when the ball is held for time purposes) and generally defenders are close when touch time is long
 shots %>%
   ggplot(aes(SHOT_DIST, TOUCH_TIME)) +
   geom_point()
+shots %>%
+  ggplot(aes(SHOT_DIST, TOUCH_TIME)) +
+  geom_point() +
+  facet_wrap(~ MISMATCH, nrow = 3)
+#seems "big men" moight tend to touch it less
+shots %>%
+  ggplot(aes(TOUCH_TIME)) +
+  geom_freqpoly() +
+  facet_wrap(~POS_SHOOTER)
+#PGs have the most "long" touches
+shots %>% 
+  ggplot(aes(SHOT_DIST)) +
+  geom_density() +
+  facet_wrap(~MISMATCH)
+#mismatches tend to occur close to the hoop which makes sense since centers and pgs would be consistenlty close there whether in a post up or drive to the hoop and "centers"big men"" should generally be closer to the hoop 
+shots %>%
+  ggplot(aes(POS_DEF, SHOT_DIST)) +
+  geom_boxplot(aes(group = POS_DEF))
+#which was shown in the boxplot
+#dribbles and touch time have a strong corrlation (but I will include both in the models below for now - won't hurt predictions)
+shots %>%
+  ggplot(aes(DRIBBLES, TOUCH_TIME)) +
+  geom_point() +
+  facet_wrap(~MISMATCH)
 colnames(shots[, !index_num])
 ```
 #some modeling "doodles"
