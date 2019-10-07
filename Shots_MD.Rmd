@@ -263,8 +263,8 @@ shots %>%
   facet_wrap(~MISMATCH)
 colnames(shots[, !index_num])
 ```
-#some modeling "doodles"
-```{r modelling_begins}
+#some modeling "doodles" - Logistic Regression
+```{r modeling_begins}
 library(caret)
 ###logistic regression without creating anykind of position variable, just an interaction
 shots <- shots %>% mutate_at("SHOT_RESULT", as.factor) %>% mutate(SHOT_NUMERIC = as.numeric(SHOT_RESULT == "made"))
@@ -272,9 +272,44 @@ test_index_glm <- createDataPartition(shots$SHOT_NUMERIC, times = 1, p = 0.5, li
 train_set_glm_shots <- shots %>% slice(-test_index_glm)
 test_set_glm_shots <- shots %>% slice(test_index_glm)
 #now fit a model
-fit_glm_shots <- glm(SHOT_NUMERIC ~ GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + PTS_TYPE + CLOSE_DEF_DIST*SHOT_DIST*MISMATCH, data = train_set_glm_shots, family = "binomial")
+fit_glm_shots <- glm(SHOT_NUMERIC ~ qtr_seconds + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + PTS_TYPE + CLOSE_DEF_DIST*SHOT_DIST*MISMATCH, data = train_set_glm_shots, family = "binomial")
 p_hat_glm_shots <- predict(fit_glm_shots, test_set_glm_shots)
 y_hat_glm_shots <- factor(ifelse(p_hat_glm_shots > 0.5, "made", "missed"))
 summary(fit_glm_shots)
 confusionMatrix(data = y_hat_glm_shots, reference = test_set_glm_shots$SHOT_RESULT)
+```
+#some modeling "doodles" - Random Forest
+```{r modeling_2}
+library(randomForest)
+install.packages("ranger")
+library(ranger)
+#nearZeroVar(train_set_glm_shots)
+na_index <- is.na(shots$SHOT_CLOCK)
+shots$SHOT_CLOCK <- if_else(na_index, shots$qtr_seconds, shots$SHOT_CLOCK)
+variables_to_use <- shots %>% select(qtr_seconds, SHOT_CLOCK, DRIBBLES, TOUCH_TIME, PTS_TYPE, CLOSE_DEF_DIST, SHOT_DIST, MISMATCH) %>% names(.)
+test_index_RF <- createDataPartition(shots$SHOT_NUMERIC, times = 1, p = 0.5, list = FALSE)
+train_set_RF <- shots %>% slice(-test_index_RF) %>% select(variables_to_use, SHOT_RESULT)
+test_set_RF <- shots %>% slice(test_index_RF) %>% select(variables_to_use, SHOT_RESULT)
+#train_rf <- randomForest(SHOT_RESULT ~ qtr_seconds + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + PTS_TYPE + CLOSE_DEF_DIST*SHOT_DIST*MISMATCH, data = train_set_RF)
+#model_ranger <- ranger(SHOT_RESULT ~ .)
+control_RF <- trainControl(method="cv", number = 4, p = 0.8)
+train_rf_tuned <-  train(SHOT_RESULT ~ ., data = train_set_RF,
+                   method = "ranger", 
+                   tuneGrid = expand.grid(.mtry = 2:4, .splitrule = "gini", .min.node.size = c(1)),
+                   num.trees = 100,
+                   trControl = control_RF)
+##train_rf_tuned works
+rain_rf_tuned <-  train(SHOT_RESULT ~ ., data = train_set_RF,
+                   method = "ranger", 
+                   num.trees = 100,
+                   trControl = control_RF)
+##also works without grid...
+fit_rf_ranger <- ranger(SHOT_RESULT ~ ., data = train_set_RF, 
+                  num.trees = 1000,
+                  min.node.size = rain_rf_tuned$bestTune$min.node.size,
+                  mtry = rain_rf_tuned$bestTune$mtry,
+                  splitrule = "extratrees")
+y_hat_rf <- predict(fit_rf_ranger, test_set_RF)
+cm_rf <- confusionMatrix(y_hat_rf$predictions, test_set_RF$SHOT_RESULT)
+#####left off, the high rate is 68%
 ```
