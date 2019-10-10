@@ -295,21 +295,32 @@ test_set_RF <- shots %>% slice(test_index_RF) %>% select(variables_to_use, SHOT_
 control_RF <- trainControl(method="cv", number = 4, p = 0.8)
 train_rf_tuned <-  train(SHOT_RESULT ~ ., data = train_set_RF,
                    method = "ranger", 
-                   tuneGrid = expand.grid(.mtry = 2:4, .splitrule = "gini", .min.node.size = c(1)),
+                   tuneGrid = expand.grid(.mtry = 2:6, .splitrule = "gini", .min.node.size = c(1)),
                    num.trees = 100,
                    trControl = control_RF)
 ##train_rf_tuned works
-rain_rf_tuned <-  train(SHOT_RESULT ~ ., data = train_set_RF,
+train_rf_no_tuned <-  train(SHOT_RESULT ~ ., data = train_set_RF,
                    method = "ranger", 
                    num.trees = 100,
                    trControl = control_RF)
 ##also works without grid...
 fit_rf_ranger <- ranger(SHOT_RESULT ~ ., data = train_set_RF, 
                   num.trees = 1000,
-                  min.node.size = rain_rf_tuned$bestTune$min.node.size,
-                  mtry = rain_rf_tuned$bestTune$mtry,
-                  splitrule = "extratrees")
+                  min.node.size = train_rf_no_tuned$bestTune$min.node.size,
+                  mtry = train_rf_n0_tuned$bestTune$mtry,
+                  splitrule = train_rf_no_tuned$bestTune$splitrule)
 y_hat_rf <- predict(fit_rf_ranger, test_set_RF)
 cm_rf <- confusionMatrix(y_hat_rf$predictions, test_set_RF$SHOT_RESULT)
-#####left off, the high rate is 68%
+#####left off, the high rate is 68% with gradient boosting
+library(gbm)
+train_boost_no_tuned <- train(SHOT_RESULT ~ ., data = train_set_RF,
+                   method = "gbm")
+##this took forever and still only got to .6191 used a tuned xgboost instead...need to convert to 0,1 even for gbm
+########
+fit_boost_no_tuned <- gbm(SHOT_RESULT ~ ., data = train_set_RF,
+                          n.trees = 100,
+                          interaction.depth = 3, 
+                          shrinkage = 0.1,
+                          n.minobsinnode = 10)
+y_hat_rf_boost <- predict(fit_rf_ranger, test_set_RF)
 ```
