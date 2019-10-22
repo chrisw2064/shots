@@ -281,7 +281,6 @@ confusionMatrix(data = y_hat_glm_shots, reference = test_set_glm_shots$SHOT_RESU
 #some modeling "doodles" - Random Forest
 ```{r modeling_2}
 library(randomForest)
-install.packages("ranger")
 library(ranger)
 #nearZeroVar(train_set_glm_shots)
 na_index <- is.na(shots$SHOT_CLOCK)
@@ -315,12 +314,52 @@ cm_rf <- confusionMatrix(y_hat_rf$predictions, test_set_RF$SHOT_RESULT)
 library(gbm)
 train_boost_no_tuned <- train(SHOT_RESULT ~ ., data = train_set_RF,
                    method = "gbm")
-##this took forever and still only got to .6191 used a tuned xgboost instead...need to convert to 0,1 even for gbm
+##gbm took forever and still only got to .6191 so switched to a tuned xgboost instead...need to convert to 0,1 even for gbm
 ########
-fit_boost_no_tuned <- gbm(SHOT_RESULT ~ ., data = train_set_RF,
-                          n.trees = 100,
-                          interaction.depth = 3, 
-                          shrinkage = 0.1,
-                          n.minobsinnode = 10)
-y_hat_rf_boost <- predict(fit_rf_ranger, test_set_RF)
+library(xgboost)
+#this will not be needed if slice is not maked by xgboost package
+train_set_RF_noslice <- shots[-test_index_RF, c('SHOT_RESULT', variables_to_use)]
+test_set_RF_noslice <- shots[test_index_RF, c('SHOT_RESULT', variables_to_use)]
+train_set_RF_noslice <- train_set_RF_noslice %>% mutate(SHOT_RESULT = as.numeric(SHOT_RESULT == "made"))
+test_set_RF_noslice <- test_set_RF_noslice %>% mutate(SHOT_RESULT = as.numeric(SHOT_RESULT == "made"))
+#
+xg_labels_train <- train_set_RF_noslice$SHOT_RESULT
+xg_labels_test <- test_set_RF_noslice$SHOT_RESULT
+trainer <- as.matrix(train_set_RF_noslice[, -1])
+tester <- as.matrix(test_set_RF_noslice[, -1])
+matrix_train_xgboost <- xgb.DMatrix(data = trainer,label = xg_labels_train)
+matrix_test_xgboost <- xgb.DMatrix(data = tester,label= xg_labels_test)
+#
+params_default_xgboost <- list(booster = "gbtree", objective = "binary:logistic", eta=0.3, gamma=0, max_depth=6, min_child_weight=1, subsample=1, colsample_bytree=1)
+xgbcv <- xgb.cv( params = params_default_xgboost, data = matrix_train_xgboost, label = xg_labels, nrounds = 100, nfold = 5, showsd = T, stratified = T, print_every_n = 10, early_stop_round = 20, maximize = F)
+xgbcv$evaluation_log$iter[xgbcv$evaluation_log$test_error_mean == min(xgbcv$evaluation_log$test_error_mean)]
+#
+xgb_grid_1 <- expand.grid(eta = 0.1, 
+                            colsample_bytree=c(0.5,0.7,1),
+                            max_depth=c(3,6),
+                            nrounds=100,
+                            gamma=1,
+                            min_child_weight=2,
+                            subsample=1
+                            )
+
+xgb_trcontrol <- trainControl(
+  method="cv",
+  number = 5,
+  verboseIter = TRUE,
+  returnData=FALSE,
+  returnResamp = "all",
+  allowParallel = TRUE
+)
+
+xgb_train_1 <- train(
+  x = matrix_train_xgboost,
+  y= as.factor(xg_labels_train),
+ trControl = xgb_trcontrol,
+ tuneGrid = xgb_grid_1,
+ method="xgbTree"
+)
+xgb_train_1
+xgb_predictions <- predict(xgb_train_1, test_set_RF_noslice)
+confusionMatrix(xgb_predictions, as.factor(test_set_RF_noslice$SHOT_RESULT))
 ```
