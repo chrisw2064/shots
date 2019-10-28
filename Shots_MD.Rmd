@@ -317,7 +317,7 @@ train_boost_no_tuned <- train(SHOT_RESULT ~ ., data = train_set_RF,
 ##gbm took forever and still only got to .6191 so switched to a tuned xgboost instead...need to convert to 0,1 even for gbm
 ########
 library(xgboost)
-#this will not be needed if slice is not maked by xgboost package
+#this will not be needed if slice is not masked by xgboost package
 train_set_RF_noslice <- shots[-test_index_RF, c('SHOT_RESULT', variables_to_use)]
 test_set_RF_noslice <- shots[test_index_RF, c('SHOT_RESULT', variables_to_use)]
 train_set_RF_noslice <- train_set_RF_noslice %>% mutate(SHOT_RESULT = as.numeric(SHOT_RESULT == "made"), LOCATION = as.numeric(LOCATION == "H"))
@@ -336,13 +336,13 @@ params_default_xgboost <- list(booster = "gbtree", objective = "binary:logistic"
 xgbcv <- xgb.cv( params = params_default_xgboost, data = matrix_train_xgboost, label = xg_labels_train, nrounds = 100, nfold = 5, showsd = T, stratified = T, print_every_n = 10, early_stop_round = 20, maximize = F)
 xgbcv$evaluation_log$iter[xgbcv$evaluation_log$test_error_mean == min(xgbcv$evaluation_log$test_error_mean)]
 #
-xgb_grid_1 <- expand.grid(eta = c(0.01, 0.05, 0.1, 0.3, 0.5),  
-                            colsample_bytree=c(0.5,0.7, 1),
-                            max_depth=c(3,6),
-                            nrounds= c(10, 50, 100, 200),
+xgb_grid_1 <- expand.grid(eta = c(0.01, 0.05, 0.1, 0.3),  
+                            colsample_bytree=c(0.5,0.7),
+                            max_depth=c(3,4),
+                            nrounds= c(100),
                             gamma=1,
                             min_child_weight=c(0.0001, 0.001, 0.01, .1, 1),
-                            subsample= c(0.2, 0.5, 0.8, 1)
+                            subsample= c(0.2, 0.5, 0.8)
                             )
 
 xgb_trcontrol <- trainControl(
@@ -362,13 +362,24 @@ xgb_train_1 <- train(
  method="xgbTree"
 )
 xgb_train_1
-xgb_shots <- xgboost(data = matrix_train_xgboost, label = as.factor(xg_labels_train), params = xgb_train_1$bestTune, nrounds = 100)
+###Tuning parameter 'nrounds' was held constant at a value of 100
+##Tuning parameter 'gamma' was held constant
+ ##at a value of 1
+###Accuracy was used to select the optimal model using the largest value.
+###The final values used for the model were nrounds = 100, max_depth = 4, eta = 0.1, gamma = 1,
+ ###colsample_bytree = 0.7, min_child_weight = 0.001 and subsample = 0.5.
+xgb_shots <- xgboost(data = matrix_train_xgboost, label = as.factor(xg_labels_train), params = xgb_train_1$bestTune, nrounds = 1000)
 xgb_predictions <- predict(xgb_shots, as.matrix(test_set_RF_noslice[, -1]))
 xgb_predictions <- if_else(xgb_predictions > .5, 1, 0)
 confusionMatrix(as.factor(xgb_predictions), as.factor(test_set_RF_noslice$SHOT_RESULT))
 #
-xgb_cheat <- xgboost(data = matrix_train_xgboost, label = as.factor(xg_labels_train), eta = 0.0001, max_depth = 3, min_child_weight = .0001, nrounds = 1000, gamma = 1, subsample = 0.5)
-xgb_predictions_cheat <- predict(xgb_cheat, as.matrix(test_set_RF_noslice[, -1]))
-xgb_predictions_cheat <- if_else(xgb_predictions > .5, 1, 0)
-confusionMatrix(as.factor(xgb_predictions_cheat), as.factor(test_set_RF_noslice$SHOT_RESULT))
+#xgb_cheat <- xgboost(data = matrix_train_xgboost, label = as.factor(xg_labels_train), eta = 0.0001, max_depth = 3, min_child_weight = .0001, nrounds = 1000, gamma = 1, subsample = 0.5)
+#xgb_predictions_cheat <- predict(xgb_cheat, as.matrix(test_set_RF_noslice[, -1]))
+#xgb_predictions_cheat <- if_else(xgb_predictions > .5, 1, 0)
+#confusionMatrix(as.factor(xgb_predictions_cheat), as.factor(test_set_RF_noslice$SHOT_RESULT))
+xgb_mod_nodes <- xgb.dump(xgb_shots, with_stats = TRUE)
+xgb_mod_nodes[1:10]
+xgb_names <- names(test_set_RF_noslice[, -1])[[2]]
+importance_matrix <- xgb.importance(xgb_names, model = xgb_shots)
+xgb.plot.importance(importance_matrix)
 ```
